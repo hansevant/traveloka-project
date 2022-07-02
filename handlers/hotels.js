@@ -1,37 +1,66 @@
 import pkg from '@prisma/client';
-import e from 'express';
 const { PrismaClient } = pkg;
+import { collabModel } from '../services/recommendation.js';
 
 const prisma = new PrismaClient();
 
 const index = async (req, res) => {
-    var hotels
-    if (!req.query.offset || !req.query.limit){
-        hotels = await prisma.hotel.findMany({
-            include: {
-                hotel_facilities: true,
-                point_of_interests: true,
-                room_facilities: true,
-            },
-        });
-        
+    const userId = req.user.user_id;
 
-    }else{
-        hotels = await prisma.hotel.findMany({
-            skip: Number(req.query.offset),
-            take: Number(req.query.limit),
-            include: {
-                hotel_facilities: true,
-                point_of_interests: true,
-                room_facilities: true,
-            },
+    const user = await prisma.user.findUnique({
+        where: {
+          firebaseId: userId,
+        },
+    })
+    
+    if(!user){
+        return res.status(404).json({
+            status: 'error',
+            message: 'user not found'
         });
-        
+    }       
+
+    const recommendations = await collabModel(user.id);
+    
+    const prismaOptions = {
+        include: {
+            hotelFacilities: true,
+            pointOfInterests: true,
+            roomFacilities: true,
+        },
     }
+
+    if(req.query.search) {
+        prismaOptions.where = {
+            OR: [
+            {
+                name: {
+                    contains: req.query.search,
+                },
+            },
+            {
+                city: {
+                    contains: req.query.search,
+                },
+            },
+        ]
+    }
+    }
+
+    const hotels = await prisma.hotel.findMany(prismaOptions);
+    
+    const sorted = hotels.sort((a,b) => {
+        return recommendations.indexOf(a.id) - recommendations.indexOf(b.id)
+    });
+
+    if(req.query.limit) {
+        sorted.splice(req.query.limit)
+    }
+
     return res.json({
         status: 'success',
         message: null,
-        data: hotels
+        data: sorted
     });
 }
 
@@ -42,9 +71,9 @@ const show = async (req, res) => {
         where:{
             id
         },include: {
-          hotel_facilities: true,
-          point_of_interests: true,
-          room_facilities: true,
+          hotelFacilities: true,
+          pointOfInterests: true,
+          roomFacilities: true,
         },
     });
 
@@ -83,7 +112,7 @@ const hotelReview = async (req,res) =>{
 
     const hotelReview = await prisma.review.findMany({
         where: {
-            hotel_id: {
+            hotelId: {
                 equals: id
             }
         }

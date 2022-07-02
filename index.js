@@ -6,6 +6,7 @@ import error from 'http-errors';
 import usersRoutes from './routes/users.js';
 import hotelsRoutes from './routes/hotels.js';
 import reviewsRoutes from './routes/reviews.js';
+import checkToken from './middlewares/check-token.js';
 
 const app = express();
 const port = process.env.PORT || 5000;
@@ -23,11 +24,11 @@ app.get('/', async (req, res) => {
 });
 
 // User Routes
-app.use('/users', usersRoutes);
+app.use('/users', checkToken, usersRoutes);
 // Hotel Routes
-app.use('/hotels', hotelsRoutes);
+app.use('/hotels', checkToken, hotelsRoutes);
 // Review Routes
-app.use('/reviews', reviewsRoutes);
+app.use('/reviews', checkToken, reviewsRoutes);
 
 
 app.use((req, res, next) => {
